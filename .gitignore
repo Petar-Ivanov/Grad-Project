@@ -1,7 +1,8 @@
+.grad/
+
 # Python / FastAPI ignores
 backend/__pycache__/
 backend/*.py[cod]
-backend/.grad/
 backend/.env
 
 # Node / React ignores
