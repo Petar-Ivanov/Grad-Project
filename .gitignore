@@ -1,13 +1,13 @@
-# Virtual Environment
-.grad/
+# Python / FastAPI ignores
+backend/__pycache__/
+backend/*.py[cod]
+backend/.grad/
+backend/.env
 
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
-*$py.class
+# Node / React ignores
+frontend/node_modules/
+frontend/dist/
+frontend/.env.local
 
-# Environment variables / Secrets
-.env
-
-# OS generated files
+# OS ignores
 .DS_Store
