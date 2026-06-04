@@ -1,94 +1,54 @@
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.exceptions.exceptions import NotFoundException
+from app.core.exceptions.exceptions import UnauthorizedException, NotFoundException
 from app.models.topic import Topic
 from app.models.user import User
 from app.schemas.topic_dto import CreateTopicDTO, TopicDTO, UpdateTopicDTO
 from app.mappers.topic_mapper import update_topic_from_dto
+from app.repositories.topic_repository import TopicRepository
 
+class TopicService:
+    def __init__(self, repo: TopicRepository):
+        self.repo = repo
 
-async def get_topics(db: AsyncSession, current_user: User) -> list[Topic]:
-    result = await db.execute(
-        select(Topic).where(Topic.owner_id == current_user.id)
-    )
+    async def get_topics(self, current_user: User) -> list[Topic]:
+        return await self.repo.get_by_owner(current_user.id)
 
-    topics = result.scalars().all()
+    async def get_topic(self, topic_id: int, current_user: User) -> Topic:
+        topic = await self.repo.get_by_id(topic_id)
+        
+        if not topic:
+            raise NotFoundException("Topic not found")
+        
+        if topic.owner_id != current_user.id:
+            raise UnauthorizedException("Unauthorized to access this topic")
+        
+        return topic
 
-    return topics
+    async def create_topic(self, topic_data: CreateTopicDTO, current_user: User) -> Topic:
+        new_topic = Topic(**topic_data.model_dump())
+        new_topic.owner_id = current_user.id
 
-async def get_topic(topic_id: int, db: AsyncSession, current_user: User) -> Topic:
-    result = await db.execute(
-        select(Topic).where(
-            Topic.id == topic_id,
-            Topic.owner_id == current_user.id
-        )
-    )
+        return await self.repo.create(new_topic)
 
-    topic = result.scalar_one_or_none()
-    
-    if not topic:
-        raise NotFoundException("Topic not found")
-    
-    return topic
+    async def update_topic(self, topic_id: int, topic_data: UpdateTopicDTO, current_user: User) -> TopicDTO:
+        topic = await self.repo.get_by_id(topic_id)
 
-async def create_topic(topic_data: CreateTopicDTO, db: AsyncSession, current_user: User) -> Topic:
-    new_topic = Topic(**topic_data.model_dump())
-    new_topic.owner_id = current_user.id
+        if not topic:
+            raise NotFoundException("Topic not found")
 
-    db.add(new_topic)
+        if topic.owner_id != current_user.id:
+            raise UnauthorizedException("Unauthorized to update this topic")
 
-    try:
-        await db.commit()
-    except:
-        await db.rollback()
-        raise
+        topic = update_topic_from_dto(topic, topic_data)
 
-    await db.refresh(new_topic)
-    
-    return new_topic
+        return await self.repo.update(topic)
 
-async def update_topic(topic_id: int, topic_data: UpdateTopicDTO, db: AsyncSession, current_user: User) -> TopicDTO:
-    result = await db.execute(
-        select(Topic).where(
-            Topic.id == topic_id,
-            Topic.owner_id == current_user.id
-        )
-    )
+    async def delete_topic(self, topic_id: int, current_user: User) -> None:
+        topic = await self.repo.get_by_id(topic_id)
 
-    topic = result.scalar_one_or_none()
+        if not topic:
+            raise NotFoundException("Topic not found")
 
-    if not topic:
-        raise NotFoundException("Topic not found")
-    
-    topic = update_topic_from_dto(topic, topic_data)
+        if topic.owner_id != current_user.id:
+            raise UnauthorizedException("Unauthorized to delete this topic")
 
-    try:
-        await db.commit()
-    except:
-        await db.rollback()
-        raise
-
-    await db.refresh(topic)
-
-    return topic
-
-async def delete_topic(topic_id: int, db: AsyncSession, current_user: User) -> None:
-    result = await db.execute(
-        select(Topic).where(
-            Topic.id == topic_id,
-            Topic.owner_id == current_user.id
-        )
-    )
-
-    topic = result.scalar_one_or_none()
-
-    if not topic:
-        raise NotFoundException("Topic not found")
-
-    await db.delete(topic)
-    
-    try:
-        await db.commit()
-    except:
-        await db.rollback()
-        raise
+        await self.repo.delete(topic)

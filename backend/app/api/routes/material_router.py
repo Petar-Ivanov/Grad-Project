@@ -1,35 +1,32 @@
 from fastapi import APIRouter, Depends, status
-from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.user import User
 from app.schemas.material_dto import MaterialDTO, CreateMaterialDTO, UpdateMaterialDTO
-from app.services import material_service
 from app.mappers.material_mapper import material_to_dto, materials_to_dto_list
-from app.db.deps import get_db, get_current_user
+from app.dependenies.auth_deps import get_current_user
+from app.dependenies.material_deps import get_material_service
+from app.services.material_service import MaterialService
 
 router = APIRouter(prefix="/materials", tags=["materials"])
 
 @router.post("/", response_model=MaterialDTO, status_code=status.HTTP_201_CREATED)
 async def create_material(
     dto: CreateMaterialDTO,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    service: MaterialService = Depends(get_material_service)
 ):
-    new_material = await material_service.create_material(
+    new_material = await service.create_material(
         dto=dto, 
-        db=db, 
         current_user=current_user
-    
     )
 
     return material_to_dto(new_material)
 
 @router.get("/", response_model=list[MaterialDTO])
 async def get_materials(
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    service: MaterialService = Depends(get_material_service)
 ):
-    materials = await material_service.get_materials(
-        db=db, 
+    materials = await service.get_materials(
         current_user=current_user
     )
 
@@ -38,12 +35,11 @@ async def get_materials(
 @router.get("/{id}", response_model=MaterialDTO)
 async def get_material(
     id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    service: MaterialService = Depends(get_material_service)
 ):
-    material = await material_service.get_material(
+    material = await service.get_material(
         material_id=id, 
-        db=db, 
         current_user=current_user
     )
 
@@ -52,12 +48,11 @@ async def get_material(
 @router.get("/topic/{topic_id}", response_model=list[MaterialDTO])
 async def get_materials_by_topic(
     topic_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    service: MaterialService = Depends(get_material_service)
 ):
-    materials = await material_service.get_materials_by_topic(
+    materials = await service.get_materials_by_topic(
         topic_id=topic_id, 
-        db=db, 
         current_user=current_user
     )
 
@@ -67,12 +62,12 @@ async def get_materials_by_topic(
 async def update_material(
     id: int,
     dto: UpdateMaterialDTO,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    service: MaterialService = Depends(get_material_service)
 ):
-    updated_material = await material_service.update_material(
+    updated_material = await service.update_material(
         material_id=id, 
-        dto=dto, db=db, 
+        dto=dto, 
         current_user=current_user
     )
 
@@ -81,12 +76,11 @@ async def update_material(
 @router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_material(
     id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    service: MaterialService = Depends(get_material_service)
 ):
-    await material_service.delete_material(
+    await service.delete_material(
         material_id=id, 
-        db=db, 
         current_user=current_user
     )
 

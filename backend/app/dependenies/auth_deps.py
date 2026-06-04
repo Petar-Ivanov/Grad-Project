@@ -5,17 +5,13 @@ from jose import jwt, JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.enums.user_role import UserRole
 from app.core.exceptions.exceptions import ForbiddenException
-
 from app.core.exceptions.exceptions import UnauthorizedException
-from app.db.session import SessionLocal
 from app.models.user import User
 from app.core.config import settings
+from app.dependenies.database_deps import get_db
+
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
-
-async def get_db():
-    async with SessionLocal() as db:
-        yield db
 
 async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)) -> User:
 

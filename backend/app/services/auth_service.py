@@ -1,57 +1,42 @@
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions.exceptions import ConflictException, UnauthorizedException
 from app.models.user import User
-from app.schemas.auth_dto import RegisterDTO
+from app.schemas.auth_dto import LoginDTO, RegisterDTO
+from app.repositories.user_repository import UserRepository
 from app.core.security import hash_password
 from app.core.security import (
     verify_password,
     create_access_token
 )
 
-async def register_user(db: AsyncSession, dto: RegisterDTO) -> User:
-    email = dto.email.lower()
+class AuthService:
+    def __init__(self, repo: UserRepository):
+        self.repo = repo
 
-    result = await db.execute(
-        select(User).where(User.email == email)
-    )
+    async def register_user(self, dto: RegisterDTO) -> User:
+        email = dto.email.lower()
 
-    existing_user = result.scalar_one_or_none()
+        existing_user = await self.repo.get_by_email(email)
 
-    if existing_user:
-        raise ConflictException("Email already exists")
+        if existing_user:
+            raise ConflictException("Email already exists")
 
-    user = User(
-        email=email,
-        name=dto.name,
-        hashed_password=hash_password(dto.password)
-    )
+        new_user = User(
+            email=email,
+            name=dto.name,
+            hashed_password=hash_password(dto.password)
+        )
 
-    db.add(user)
-    
-    try:
-        await db.commit()
-    except:
-        await db.rollback()
-        raise
+        return await self.repo.create_user(new_user)
 
-    await db.refresh(user)
+    async def login_user(self, dto: LoginDTO) -> tuple[str, str]:
+        existing_user = await self.repo.get_by_email(dto.email.lower())
 
-    return user
+        if not existing_user or not verify_password(dto.password, existing_user.hashed_password):
+            raise UnauthorizedException("Invalid credentials")
 
-async def login_user(db: AsyncSession, email: str, password: str) -> tuple[str, str]:
-    result = await db.execute(
-        select(User).where(User.email == email)
-    )
-    
-    user = result.scalar_one_or_none()
+        token = create_access_token({
+            "sub": str(existing_user.id),
+            "type": "access"
+        })
 
-    if not user or not verify_password(password, user.hashed_password): 
-        raise UnauthorizedException("Invalid credentials")
-
-    token = create_access_token({
-    "sub": str(user.id),
-    "type": "access"
-    })
-
-    return token, "bearer"
+        return token, "bearer"
